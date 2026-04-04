@@ -1,33 +1,38 @@
-"""Точка входа в приложение DT Analytics."""
+"""Точка входа приложения для DT Analytics."""
 
 from __future__ import annotations
 
 import sys
-from typing import Sequence
+from collections.abc import Sequence
+
+from dt_analytics.bootstrap import build_container, create_application, initialize_runtime
+from dt_analytics.config import load_settings
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """
-    Запустить приложение.
+    Запустить приложение DT Analytics.
 
     Параметры
     ----------
     argv:
-    Необязательные аргументы командной строки. Если не указаны, используется sys.argv.
+        Необязательные аргументы командной строки. Если не указаны,
+        используется ``sys.argv``.
 
     Возвращает
     -------
     int
-    Код завершения процесса.
+        Код завершения процесса.
     """
     args = list(argv) if argv is not None else list(sys.argv)
 
-    # Точка входа-заглушка для блока A.
-    # Полная инициализация runtime/bootstrap будет добавлена в блоке B.
-    print("DT Analytics: базовый каркас проекта готов.")
-    print(f"Аргументы: {args}")
+    settings = load_settings()
+    runtime = initialize_runtime(settings)
+    container = build_container(settings=settings, runtime=runtime)
+    app_instance = create_application(argv=args, container=container)
 
-    return 0
+    app_instance.main_window.show()
+    return app_instance.qt_app.exec()
 
 
 if __name__ == "__main__":
