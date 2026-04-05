@@ -1,4 +1,4 @@
-"""DT Analytics application package."""
+"""Пакет приложения DT Analytics."""
 
 __all__ = ["__version__"]
 

@@ -1,4 +1,4 @@
-"""Domain layer package."""
+"""Пакет доменного слоя."""
 
 from dt_analytics.domain.entities import (
     ArtifactReference,
@@ -21,6 +21,22 @@ from dt_analytics.domain.enums import (
     MissingStrategy,
     TaskType,
 )
+from dt_analytics.domain.repositories import (
+    ArtifactRepository,
+    DatasetRepository,
+    ExperimentRepository,
+    ProjectRepository,
+)
+from dt_analytics.domain.services import (
+    DatasetProfileResult,
+    DatasetProfileService,
+    DatasetStructureSnapshot,
+    ExperimentExecutionInput,
+    ExperimentExecutionOutput,
+    FeatureSnapshot,
+    MlExperimentService,
+    PreparedDatasetSummary,
+)
 from dt_analytics.domain.value_objects import (
     ArtifactId,
     DatasetId,
@@ -38,29 +54,41 @@ from dt_analytics.domain.value_objects import (
 __all__ = [
     "ArtifactId",
     "ArtifactReference",
+    "ArtifactRepository",
     "ArtifactType",
     "CategoricalEncodingStrategy",
     "Dataset",
     "DatasetId",
     "DatasetProfile",
+    "DatasetProfileResult",
+    "DatasetProfileService",
+    "DatasetRepository",
+    "DatasetStructureSnapshot",
     "EvaluationResult",
     "EvaluationResultId",
     "Experiment",
+    "ExperimentExecutionInput",
+    "ExperimentExecutionOutput",
     "ExperimentId",
+    "ExperimentRepository",
     "ExperimentStatus",
     "FeatureDefinition",
     "FeatureId",
     "FeatureRole",
+    "FeatureSnapshot",
     "FileReference",
     "LogicalFeatureType",
     "MissingStrategy",
+    "MlExperimentService",
     "ModelConfig",
     "ModelConfigId",
     "PreprocessingConfig",
     "PreprocessingConfigId",
+    "PreparedDatasetSummary",
     "ProfileId",
     "Project",
     "ProjectId",
+    "ProjectRepository",
     "TaskType",
     "TrainingResult",
     "TrainingResultId",
