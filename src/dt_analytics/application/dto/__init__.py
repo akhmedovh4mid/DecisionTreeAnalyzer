@@ -12,6 +12,14 @@ from dt_analytics.application.dto.dataset_dto import (
     ImportedDatasetResultDto,
     ProfileDatasetRequest,
 )
+from dt_analytics.application.dto.experiment_dto import (
+    CreateExperimentRequest,
+    ExperimentDto,
+    ExperimentResultDto,
+    ExperimentRunResultDto,
+    GetExperimentResultRequest,
+    RunExperimentRequest,
+)
 from dt_analytics.application.dto.ml_experiment_dto import (
     ArtifactReferenceDto,
     EvaluationResultDto,
@@ -32,6 +40,7 @@ from dt_analytics.application.dto.project_dto import (
 
 __all__ = [
     "ArtifactReferenceDto",
+    "CreateExperimentRequest",
     "CreateProjectRequest",
     "CsvImportOptionsDto",
     "DatasetDto",
@@ -39,9 +48,13 @@ __all__ = [
     "DatasetProfileDto",
     "DatasetProfilingSummaryDto",
     "EvaluationResultDto",
+    "ExperimentDto",
+    "ExperimentResultDto",
+    "ExperimentRunResultDto",
     "ExperimentSummaryDto",
     "FeatureDto",
     "GetDatasetPreviewRequest",
+    "GetExperimentResultRequest",
     "ImportedDatasetResultDto",
     "ImportCsvDatasetRequest",
     "MlExperimentResultDto",
@@ -51,6 +64,7 @@ __all__ = [
     "PreprocessingConfigDto",
     "ProfileDatasetRequest",
     "ProjectDto",
+    "RunExperimentRequest",
     "RunMlExperimentRequest",
     "SaveProjectRequest",
     "TrainingResultDto",
