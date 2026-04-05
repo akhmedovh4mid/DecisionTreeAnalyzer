@@ -20,13 +20,17 @@ from dt_analytics.application.use_cases.datasets import (
     ImportCsvDatasetUseCase,
     ProfileDatasetUseCase,
 )
+from dt_analytics.application.use_cases.experiments import (
+    CreateExperimentUseCase,
+    RunDecisionTreeExperimentUseCase,
+)
 from dt_analytics.application.use_cases.project import (
     CreateProjectUseCase,
     OpenProjectUseCase,
     SaveProjectUseCase,
 )
 from dt_analytics.config.schemas import AppSettings
-from dt_analytics.presentation.controllers import DatasetController
+from dt_analytics.presentation.controllers import DatasetController, ExperimentController
 from dt_analytics.presentation.dialogs import (
     ErrorDialog,
     ImportDatasetDialog,
@@ -56,6 +60,8 @@ class MainWindowController:
         get_dataset_preview_use_case: GetDatasetPreviewUseCase,
         import_csv_dataset_use_case: ImportCsvDatasetUseCase,
         profile_dataset_use_case: ProfileDatasetUseCase,
+        create_experiment_use_case: CreateExperimentUseCase,
+        run_experiment_use_case: RunDecisionTreeExperimentUseCase,
     ) -> None:
         self._settings = settings
         self._create_project_use_case = create_project_use_case
@@ -66,15 +72,24 @@ class MainWindowController:
         self._profile_dataset_use_case = profile_dataset_use_case
         self._state = MainWindowState()
         self._view = None
+
         self._dataset_controller = DatasetController(
             get_dataset_preview_use_case=get_dataset_preview_use_case,
             profile_dataset_use_case=profile_dataset_use_case,
+        )
+        self._experiment_controller = ExperimentController(
+            create_experiment_use_case=create_experiment_use_case,
+            run_experiment_use_case=run_experiment_use_case,
         )
 
     def bind_view(self, view) -> None:
         """Привязать Qt‑виджет к контроллеру."""
         self._view = view
         self._dataset_controller.bind_view(view.dataset_viewer_page)
+        self._experiment_controller.bind_views(
+            preprocessing_page=view.preprocessing_config_page,
+            model_page=view.model_config_page,
+        )
         self._refresh_view()
 
     def create_project(self) -> None:
@@ -111,6 +126,7 @@ class MainWindowController:
         self._state.datasets = []
         self._state.experiments = []
         self._dataset_controller.clear()
+        self._experiment_controller.clear()
         self._refresh_view()
         self._view.show_status_message(f"Проект '{self._state.project.name}' создан.")
 
@@ -144,6 +160,7 @@ class MainWindowController:
         self._state.datasets = []
         self._state.experiments = []
         self._dataset_controller.clear()
+        self._experiment_controller.clear()
         self._refresh_view()
         self._view.show_status_message(f"Проект '{self._state.project.name}' открыт.")
 
@@ -243,8 +260,39 @@ class MainWindowController:
             project_id=self._state.project.id,
             dataset=imported.dataset,
         )
+        self._experiment_controller.set_context(
+            project_id=self._state.project.id,
+            dataset_id=imported.dataset.id,
+        )
         self._view.switch_to_dataset_page()
         self._view.show_status_message(f"Набор данных '{imported.dataset.name}' импортирован.")
+
+    def open_experiment_configuration(self) -> None:
+        """Open preprocessing/model configuration page for current dataset."""
+        if self._view is None:
+            return
+
+        if self._state.project is None:
+            self._show_error(
+                title="No Project",
+                message="Open or create a project first.",
+            )
+            return
+
+        if not self._state.datasets:
+            self._show_error(
+                title="No Dataset",
+                message="Import a dataset before configuring an experiment.",
+            )
+            return
+
+        dataset = self._state.datasets[-1]
+        self._experiment_controller.set_context(
+            project_id=self._state.project.id,
+            dataset_id=dataset.id,
+        )
+        self._view.preprocessing_config_page.set_dataset(dataset)
+        self._view.switch_to_experiment_config_page()
 
     def on_tree_node_activated(self, node_type: str, entity_id: str) -> None:
         """Обработать активацию узла дерева проекта."""
@@ -266,6 +314,10 @@ class MainWindowController:
                 self._dataset_controller.load_dataset(
                     project_id=self._state.project.id,
                     dataset=dataset,
+                )
+                self._experiment_controller.set_context(
+                    project_id=self._state.project.id,
+                    dataset_id=dataset.id,
                 )
                 self._view.switch_to_dataset_page()
             return
@@ -294,6 +346,7 @@ class MainWindowController:
 
         if self._state.project is None:
             self._dataset_controller.clear()
+            self._experiment_controller.clear()
             self._view.switch_to_home_page()
             self._view.set_home_message(
                 "Нет открытого проекта.\nСоздайте или откройте проект, чтобы начать работу."

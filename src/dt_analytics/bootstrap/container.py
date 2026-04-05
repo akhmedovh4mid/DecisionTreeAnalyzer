@@ -9,6 +9,10 @@ from dt_analytics.application.use_cases.datasets import (
     ImportCsvDatasetUseCase,
     ProfileDatasetUseCase,
 )
+from dt_analytics.application.use_cases.experiments import (
+    CreateExperimentUseCase,
+    RunDecisionTreeExperimentUseCase,
+)
 from dt_analytics.application.use_cases.project import (
     CreateProjectUseCase,
     OpenProjectUseCase,
@@ -17,6 +21,21 @@ from dt_analytics.application.use_cases.project import (
 from dt_analytics.bootstrap.runtime import RuntimeContext
 from dt_analytics.config.schemas import AppSettings
 from dt_analytics.infrastructure.data_sources import CsvLoader, DataFrameProfileService
+from dt_analytics.infrastructure.ml.evaluation import ClassificationMetricsEvaluator
+from dt_analytics.infrastructure.ml.interpretation import (
+    FeatureImportanceExtractor,
+    TreeMetadataExtractor,
+)
+from dt_analytics.infrastructure.ml.models import DecisionTreeClassifierFactory
+from dt_analytics.infrastructure.ml.preprocessing import (
+    FeatureTypeResolver,
+    SklearnPreprocessingPipelineBuilder,
+)
+from dt_analytics.infrastructure.ml.serialization import ModelSerializer
+from dt_analytics.infrastructure.ml.training import (
+    SklearnDecisionTreeExperimentService,
+    SklearnDecisionTreeTrainer,
+)
 from dt_analytics.infrastructure.persistence.filesystem.dataset_store import DatasetStore
 from dt_analytics.infrastructure.persistence.filesystem.project_storage import ProjectStorage
 from dt_analytics.infrastructure.persistence.sqlite.connection import create_connection
@@ -44,6 +63,9 @@ class AppContainer:
     import_csv_dataset_use_case: ImportCsvDatasetUseCase
     profile_dataset_use_case: ProfileDatasetUseCase
 
+    create_experiment_use_case: CreateExperimentUseCase
+    run_experiment_use_case: RunDecisionTreeExperimentUseCase
+
 
 def build_container(settings: AppSettings, runtime: RuntimeContext) -> AppContainer:
     """Создать корневой контейнер зависимостей."""
@@ -64,6 +86,19 @@ def build_container(settings: AppSettings, runtime: RuntimeContext) -> AppContai
 
     csv_loader = CsvLoader()
     dataframe_profile_service = DataFrameProfileService()
+
+    ml_experiment_service = SklearnDecisionTreeExperimentService(
+        dataframe_profile_service=dataframe_profile_service,
+        preprocessing_builder=SklearnPreprocessingPipelineBuilder(
+            feature_type_resolver=FeatureTypeResolver(),
+        ),
+        model_factory=DecisionTreeClassifierFactory(),
+        trainer=SklearnDecisionTreeTrainer(),
+        evaluator=ClassificationMetricsEvaluator(),
+        tree_metadata_extractor=TreeMetadataExtractor(),
+        feature_importance_extractor=FeatureImportanceExtractor(),
+        model_serializer=ModelSerializer(),
+    )
 
     create_project_use_case = CreateProjectUseCase(
         project_repository=project_repository,
@@ -95,6 +130,19 @@ def build_container(settings: AppSettings, runtime: RuntimeContext) -> AppContai
         dataset_repository=dataset_repository,
     )
 
+    create_experiment_use_case = CreateExperimentUseCase(
+        project_repository=project_repository,
+        dataset_repository=dataset_repository,
+        experiment_repository=experiment_repository,
+    )
+    run_experiment_use_case = RunDecisionTreeExperimentUseCase(
+        project_repository=project_repository,
+        dataset_repository=dataset_repository,
+        experiment_repository=experiment_repository,
+        artifact_repository=artifact_repository,
+        ml_experiment_service=ml_experiment_service,
+    )
+
     return AppContainer(
         settings=settings,
         runtime=runtime,
@@ -104,4 +152,6 @@ def build_container(settings: AppSettings, runtime: RuntimeContext) -> AppContai
         get_dataset_preview_use_case=get_dataset_preview_use_case,
         import_csv_dataset_use_case=import_csv_dataset_use_case,
         profile_dataset_use_case=profile_dataset_use_case,
+        create_experiment_use_case=create_experiment_use_case,
+        run_experiment_use_case=run_experiment_use_case,
     )

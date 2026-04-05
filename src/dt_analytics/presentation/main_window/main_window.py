@@ -8,10 +8,13 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QSplitter,
     QStackedWidget,
     QStatusBar,
     QTextEdit,
     QToolBar,
+    QVBoxLayout,
+    QWidget,
 )
 
 from dt_analytics.application.dto import DatasetDto, ExperimentDto, ProjectDto
@@ -20,7 +23,11 @@ from dt_analytics.presentation.main_window.main_window_controller import (
     MainWindowController,
 )
 from dt_analytics.presentation.models import ProjectTreeModel
-from dt_analytics.presentation.pages import DatasetViewerPage
+from dt_analytics.presentation.pages import (
+    DatasetViewerPage,
+    ModelConfigPage,
+    PreprocessingConfigPage,
+)
 from dt_analytics.presentation.widgets import ProjectTreeWidget
 
 
@@ -45,8 +52,20 @@ class MainWindow(QMainWindow):
 
         self._dataset_viewer_page = DatasetViewerPage(self)
 
+        self._experiment_config_page = QWidget(self)
+        self._preprocessing_config_page = PreprocessingConfigPage(self)
+        self._model_config_page = ModelConfigPage(self)
+
+        experiment_layout = QVBoxLayout(self._experiment_config_page)
+        splitter = QSplitter(Qt.Orientation.Horizontal, self._experiment_config_page)
+        splitter.addWidget(self._preprocessing_config_page)
+        splitter.addWidget(self._model_config_page)
+        splitter.setSizes([600, 500])
+        experiment_layout.addWidget(splitter)
+
         self._workspace_stack.addWidget(self._home_page)
         self._workspace_stack.addWidget(self._dataset_viewer_page)
+        self._workspace_stack.addWidget(self._experiment_config_page)
 
         self._project_status_label = QLabel("Проект: —", self)
         self._dataset_status_label = QLabel("Наборы данных: 0", self)
@@ -57,8 +76,16 @@ class MainWindow(QMainWindow):
 
     @property
     def dataset_viewer_page(self) -> DatasetViewerPage:
-        """Expose dataset viewer page for controller binding."""
+        """Предоставить доступ к странице просмотра набора данных для привязки контроллера"""
         return self._dataset_viewer_page
+
+    @property
+    def preprocessing_config_page(self) -> PreprocessingConfigPage:
+        return self._preprocessing_config_page
+
+    @property
+    def model_config_page(self) -> ModelConfigPage:
+        return self._model_config_page
 
     def _setup_ui(self) -> None:
         """Настроить интерфейс главного окна."""
@@ -92,6 +119,11 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction("Выход", self.close)
 
+        experiment_menu = menu_bar.addMenu("Эксперимент")
+        experiment_menu.addAction(
+            "Настроить эксперимент", self._controller.open_experiment_configuration
+        )
+
         help_menu = menu_bar.addMenu("Справка")
         help_menu.addAction("О программе", self._show_about_dialog)
 
@@ -106,6 +138,8 @@ class MainWindow(QMainWindow):
         toolbar.addAction("Сохранить проект", self._controller.save_project)
         toolbar.addSeparator()
         toolbar.addAction("Импорт CSV", self._controller.import_csv_dataset)
+        toolbar.addSeparator()
+        toolbar.addAction("Настроить эксперимент", self._controller.open_experiment_configuration)
 
     def _setup_docks(self) -> None:
         """Создать панели‑доки."""
@@ -149,6 +183,9 @@ class MainWindow(QMainWindow):
     def switch_to_dataset_page(self) -> None:
         """Показать страницу просмотра набора данных."""
         self._workspace_stack.setCurrentWidget(self._dataset_viewer_page)
+
+    def switch_to_experiment_config_page(self) -> None:
+        self._workspace_stack.setCurrentWidget(self._experiment_config_page)
 
     def set_home_message(self, text: str) -> None:
         """Заменить текстовое сообщение на домашней странице."""

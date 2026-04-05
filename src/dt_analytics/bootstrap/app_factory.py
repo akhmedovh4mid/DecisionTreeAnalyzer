@@ -38,6 +38,8 @@ def create_application(
         get_dataset_preview_use_case=container.get_dataset_preview_use_case,
         import_csv_dataset_use_case=container.import_csv_dataset_use_case,
         profile_dataset_use_case=container.profile_dataset_use_case,
+        create_experiment_use_case=container.create_experiment_use_case,
+        run_experiment_use_case=container.run_experiment_use_case,
     )
 
     main_window = MainWindow(
