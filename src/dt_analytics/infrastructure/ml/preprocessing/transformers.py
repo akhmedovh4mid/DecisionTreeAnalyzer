@@ -59,10 +59,8 @@ def build_categorical_pipeline(
         imputer = SimpleImputer(strategy="most_frequent")
     else:
         raise ValueError(
-            (
-                "Неподдерживаемая стратегия пропусков для категориальных признаков: ",
-                f"{preprocessing_config.missing_strategy!s}",
-            )
+            "Неподдерживаемая стратегия пропусков для категориальных признаков: "
+            f"{preprocessing_config.missing_strategy!s}"
         )
 
     if preprocessing_config.categorical_encoding_strategy is CategoricalEncodingStrategy.ONE_HOT:
