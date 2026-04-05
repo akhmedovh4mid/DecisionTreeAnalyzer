@@ -37,6 +37,7 @@ def create_application(
         save_project_use_case=container.save_project_use_case,
         get_dataset_preview_use_case=container.get_dataset_preview_use_case,
         import_csv_dataset_use_case=container.import_csv_dataset_use_case,
+        profile_dataset_use_case=container.profile_dataset_use_case,
     )
 
     main_window = MainWindow(

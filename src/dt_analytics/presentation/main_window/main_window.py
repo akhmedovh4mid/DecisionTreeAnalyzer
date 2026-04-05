@@ -8,10 +8,10 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QStackedWidget,
     QStatusBar,
     QTextEdit,
     QToolBar,
-    # QWidget,
 )
 
 from dt_analytics.application.dto import DatasetDto, ExperimentDto, ProjectDto
@@ -20,6 +20,7 @@ from dt_analytics.presentation.main_window.main_window_controller import (
     MainWindowController,
 )
 from dt_analytics.presentation.models import ProjectTreeModel
+from dt_analytics.presentation.pages import DatasetViewerPage
 from dt_analytics.presentation.widgets import ProjectTreeWidget
 
 
@@ -38,8 +39,14 @@ class MainWindow(QMainWindow):
         self._project_tree_model = ProjectTreeModel()
         self._project_tree_widget = ProjectTreeWidget(self._project_tree_model, self)
 
-        self._workspace = QTextEdit(self)
-        self._workspace.setReadOnly(True)
+        self._workspace_stack = QStackedWidget(self)
+        self._home_page = QTextEdit(self)
+        self._home_page.setReadOnly(True)
+
+        self._dataset_viewer_page = DatasetViewerPage(self)
+
+        self._workspace_stack.addWidget(self._home_page)
+        self._workspace_stack.addWidget(self._dataset_viewer_page)
 
         self._project_status_label = QLabel("Проект: —", self)
         self._dataset_status_label = QLabel("Наборы данных: 0", self)
@@ -47,6 +54,11 @@ class MainWindow(QMainWindow):
 
         self._setup_ui()
         self._controller.bind_view(self)
+
+    @property
+    def dataset_viewer_page(self) -> DatasetViewerPage:
+        """Expose dataset viewer page for controller binding."""
+        return self._dataset_viewer_page
 
     def _setup_ui(self) -> None:
         """Настроить интерфейс главного окна."""
@@ -57,8 +69,8 @@ class MainWindow(QMainWindow):
             self._settings.window.min_height,
         )
 
-        self._workspace.setPlainText("Нет открытого проекта.")
-        self.setCentralWidget(self._workspace)
+        self._home_page.setPlainText("Нет открытого проекта.")
+        self.setCentralWidget(self._workspace_stack)
 
         self._setup_menu_bar()
         self._setup_toolbar()
@@ -130,9 +142,17 @@ class MainWindow(QMainWindow):
             )
             self._project_tree_widget.expand_all_nodes()
 
-    def set_workspace_message(self, text: str) -> None:
-        """Заменить сообщение‑заглушку в рабочей области."""
-        self._workspace.setPlainText(text)
+    def switch_to_home_page(self) -> None:
+        """Показать домашнюю страницу по умолчанию."""
+        self._workspace_stack.setCurrentWidget(self._home_page)
+
+    def switch_to_dataset_page(self) -> None:
+        """Показать страницу просмотра набора данных."""
+        self._workspace_stack.setCurrentWidget(self._dataset_viewer_page)
+
+    def set_home_message(self, text: str) -> None:
+        """Заменить текстовое сообщение на домашней странице."""
+        self._home_page.setPlainText(text)
 
     def update_window_context(
         self,

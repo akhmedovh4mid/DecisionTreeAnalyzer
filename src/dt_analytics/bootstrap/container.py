@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# from pathlib import Path
 from dt_analytics.application.use_cases.datasets import (
     GetDatasetPreviewUseCase,
     ImportCsvDatasetUseCase,
+    ProfileDatasetUseCase,
 )
 from dt_analytics.application.use_cases.project import (
     CreateProjectUseCase,
@@ -42,6 +42,7 @@ class AppContainer:
 
     get_dataset_preview_use_case: GetDatasetPreviewUseCase
     import_csv_dataset_use_case: ImportCsvDatasetUseCase
+    profile_dataset_use_case: ProfileDatasetUseCase
 
 
 def build_container(settings: AppSettings, runtime: RuntimeContext) -> AppContainer:
@@ -89,6 +90,10 @@ def build_container(settings: AppSettings, runtime: RuntimeContext) -> AppContai
         dataset_store=dataset_store,
         dataset_profile_service=dataframe_profile_service,
     )
+    profile_dataset_use_case = ProfileDatasetUseCase(
+        project_repository=project_repository,
+        dataset_repository=dataset_repository,
+    )
 
     return AppContainer(
         settings=settings,
@@ -98,4 +103,5 @@ def build_container(settings: AppSettings, runtime: RuntimeContext) -> AppContai
         save_project_use_case=save_project_use_case,
         get_dataset_preview_use_case=get_dataset_preview_use_case,
         import_csv_dataset_use_case=import_csv_dataset_use_case,
+        profile_dataset_use_case=profile_dataset_use_case,
     )

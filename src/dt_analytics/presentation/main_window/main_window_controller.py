@@ -13,10 +13,12 @@ from dt_analytics.application.dto import (
     ImportCsvDatasetRequest,
     OpenProjectRequest,
     ProjectDto,
+    SaveProjectRequest,
 )
 from dt_analytics.application.use_cases.datasets import (
     GetDatasetPreviewUseCase,
     ImportCsvDatasetUseCase,
+    ProfileDatasetUseCase,
 )
 from dt_analytics.application.use_cases.project import (
     CreateProjectUseCase,
@@ -24,6 +26,7 @@ from dt_analytics.application.use_cases.project import (
     SaveProjectUseCase,
 )
 from dt_analytics.config.schemas import AppSettings
+from dt_analytics.presentation.controllers import DatasetController
 from dt_analytics.presentation.dialogs import (
     ErrorDialog,
     ImportDatasetDialog,
@@ -52,6 +55,7 @@ class MainWindowController:
         save_project_use_case: SaveProjectUseCase,
         get_dataset_preview_use_case: GetDatasetPreviewUseCase,
         import_csv_dataset_use_case: ImportCsvDatasetUseCase,
+        profile_dataset_use_case: ProfileDatasetUseCase,
     ) -> None:
         self._settings = settings
         self._create_project_use_case = create_project_use_case
@@ -59,12 +63,18 @@ class MainWindowController:
         self._save_project_use_case = save_project_use_case
         self._get_dataset_preview_use_case = get_dataset_preview_use_case
         self._import_csv_dataset_use_case = import_csv_dataset_use_case
+        self._profile_dataset_use_case = profile_dataset_use_case
         self._state = MainWindowState()
         self._view = None
+        self._dataset_controller = DatasetController(
+            get_dataset_preview_use_case=get_dataset_preview_use_case,
+            profile_dataset_use_case=profile_dataset_use_case,
+        )
 
     def bind_view(self, view) -> None:
         """Привязать Qt‑виджет к контроллеру."""
         self._view = view
+        self._dataset_controller.bind_view(view.dataset_viewer_page)
         self._refresh_view()
 
     def create_project(self) -> None:
@@ -100,6 +110,7 @@ class MainWindowController:
         self._state.project = result.unwrap()
         self._state.datasets = []
         self._state.experiments = []
+        self._dataset_controller.clear()
         self._refresh_view()
         self._view.show_status_message(f"Проект '{self._state.project.name}' создан.")
 
@@ -132,6 +143,7 @@ class MainWindowController:
         self._state.project = result.unwrap()
         self._state.datasets = []
         self._state.experiments = []
+        self._dataset_controller.clear()
         self._refresh_view()
         self._view.show_status_message(f"Проект '{self._state.project.name}' открыт.")
 
@@ -141,10 +153,7 @@ class MainWindowController:
             return
 
         result = self._save_project_use_case.execute(
-            __import__(
-                "dt_analytics.application.dto.project_dto",
-                fromlist=["SaveProjectRequest"],
-            ).SaveProjectRequest(
+            SaveProjectRequest(
                 project_id=self._state.project.id,
                 storage_path=self._state.project.storage_path,
             )
@@ -230,6 +239,11 @@ class MainWindowController:
         imported = import_result.unwrap()
         self._state.datasets.append(imported.dataset)
         self._refresh_view()
+        self._dataset_controller.load_dataset(
+            project_id=self._state.project.id,
+            dataset=imported.dataset,
+        )
+        self._view.switch_to_dataset_page()
         self._view.show_status_message(f"Набор данных '{imported.dataset.name}' импортирован.")
 
     def on_tree_node_activated(self, node_type: str, entity_id: str) -> None:
@@ -238,22 +252,22 @@ class MainWindowController:
             return
 
         if node_type == "project" and self._state.project is not None:
-            self._view.set_workspace_message(
+            self._view.switch_to_home_page()
+            self._view.set_home_message(
                 f"Проект: {self._state.project.name}\n"
                 f"Наборы данных: {len(self._state.datasets)}\n"
                 f"Эксперименты: {len(self._state.experiments)}"
             )
             return
 
-        if node_type == "dataset":
+        if node_type == "dataset" and self._state.project is not None:
             dataset = next((item for item in self._state.datasets if item.id == entity_id), None)
             if dataset is not None:
-                self._view.set_workspace_message(
-                    f"Набор данных: {dataset.name}\n"
-                    f"Строки: {dataset.row_count}\n"
-                    f"Столбцы: {dataset.column_count}\n"
-                    f"Формат: {dataset.format}"
+                self._dataset_controller.load_dataset(
+                    project_id=self._state.project.id,
+                    dataset=dataset,
                 )
+                self._view.switch_to_dataset_page()
             return
 
         if node_type == "experiment":
@@ -262,7 +276,8 @@ class MainWindowController:
                 None,
             )
             if experiment is not None:
-                self._view.set_workspace_message(
+                self._view.switch_to_home_page()
+                self._view.set_home_message(
                     f"Эксперимент: {experiment.name}\nСтатус: {experiment.status}"
                 )
 
@@ -278,7 +293,9 @@ class MainWindowController:
         )
 
         if self._state.project is None:
-            self._view.set_workspace_message(
+            self._dataset_controller.clear()
+            self._view.switch_to_home_page()
+            self._view.set_home_message(
                 "Нет открытого проекта.\nСоздайте или откройте проект, чтобы начать работу."
             )
             self._view.update_window_context(
@@ -287,7 +304,8 @@ class MainWindowController:
                 experiment_count=0,
             )
         else:
-            self._view.set_workspace_message(
+            self._view.switch_to_home_page()
+            self._view.set_home_message(
                 f"Проект '{self._state.project.name}' готов к работе.\n"
                 "Вы можете импортировать наборы данных через панель инструментов или меню 'Файл'."
             )
