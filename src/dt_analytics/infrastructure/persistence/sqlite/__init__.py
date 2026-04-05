@@ -1,0 +1,1 @@
+"""Пакет SQLite‑хранилища (persistence)."""
