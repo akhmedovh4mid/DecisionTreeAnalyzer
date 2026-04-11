@@ -4,12 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from src.core.analysis import DataAnalyzer
 from src.core.data_loading import DataLoader
 from src.core.decision_tree import DecisionTreeBuilder
 from src.core.evaluation import QualityEvaluator
 from src.core.prediction import Predictor
 from src.core.preprocessing import DataPreprocessor
 from src.domain.dataset import Dataset
+from src.domain.dataset_info import DatasetInfo
 from src.domain.decision_tree_model import DecisionTreeModel
 from src.domain.evaluation_metrics import EvaluationMetrics
 from src.domain.prediction_result import PredictionResult
@@ -19,9 +21,13 @@ from src.domain.processed_dataset import ProcessedDataset
 class ScenarioControllerError(Exception):
     """Базовая ошибка модуля управления сценарием работы."""
 
+    pass
+
 
 class PipelineNotExecutedError(ScenarioControllerError):
     """Ошибка: попытка получить результат до выполнения pipeline."""
+
+    pass
 
 
 PredictionScope = Literal["train", "test", "full"]
@@ -62,6 +68,7 @@ class ControllerPipelineResult:
     """
 
     dataset: Dataset
+    dataset_info: DatasetInfo
     processed_dataset: ProcessedDataset
     model: DecisionTreeModel
     prediction_result: PredictionResult
@@ -117,14 +124,16 @@ class ApplicationController:
     def __init__(
         self,
         *,
-        data_loader: DataLoader | None = None,
-        preprocessor: DataPreprocessor | None = None,
-        tree_builder: DecisionTreeBuilder | None = None,
-        predictor: Predictor | None = None,
-        evaluator: QualityEvaluator | None = None,
-    ) -> None:
+        data_loader=None,
+        preprocessor=None,
+        analyzer=None,
+        tree_builder=None,
+        predictor=None,
+        evaluator=None,
+    ):
         self._data_loader = data_loader or DataLoader()
         self._preprocessor = preprocessor or DataPreprocessor()
+        self._analyzer = analyzer or DataAnalyzer()
         self._tree_builder = tree_builder or DecisionTreeBuilder()
         self._predictor = predictor or Predictor()
         self._evaluator = evaluator or QualityEvaluator()
@@ -219,6 +228,7 @@ class ApplicationController:
 
         try:
             dataset = self.load_dataset(file_path)
+            dataset_info = self.analyze_dataset(dataset, config.target_column)
             processed_dataset = self.preprocess_dataset(dataset, config.target_column)
             model = self.build_model(processed_dataset)
             prediction_result = self.make_prediction(
@@ -238,6 +248,7 @@ class ApplicationController:
 
         result = ControllerPipelineResult(
             dataset=dataset,
+            dataset_info=dataset_info,
             processed_dataset=processed_dataset,
             model=model,
             prediction_result=prediction_result,
@@ -263,10 +274,16 @@ class ApplicationController:
                 f"Ошибка на этапе загрузки данных: {exc}"
             ) from exc
 
+    def analyze_dataset(self, dataset: Dataset, target_column: str) -> DatasetInfo:
+        try:
+            return self._analyzer.analyze(dataset, target_column)
+        except Exception as exc:
+            raise ScenarioControllerError(
+                f"Ошибка на этапе анализа данных: {exc}"
+            ) from exc
+
     def preprocess_dataset(
-        self,
-        dataset: Dataset,
-        target_column: str,
+        self, dataset: Dataset, target_column: str
     ) -> ProcessedDataset:
         """
         Выполняет только этап предварительной обработки данных.
@@ -328,13 +345,7 @@ class ApplicationController:
             ) from exc
 
     def get_metrics_summary(self) -> dict[str, float]:
-        """
-        Возвращает краткую сводку метрик последнего запуска.
-
-        Удобно для быстрого вывода в UI-виджет.
-        """
-        metrics = self.last_result.evaluation_metrics
-        return metrics.score_summary
+        return self.last_result.evaluation_metrics.score_summary
 
     def get_model_summary(self) -> dict[str, int | str]:
         """
@@ -365,3 +376,6 @@ class ApplicationController:
         Возвращает важности признаков последней обученной модели.
         """
         return self.last_result.model.feature_importances
+
+    def get_dataset_summary(self) -> dict[str, int | str]:
+        return self.last_result.dataset_info.summary

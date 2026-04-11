@@ -11,12 +11,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from src.app.controller.application_controller import ControllerPipelineResult
 from src.domain.dataset import Dataset
+from src.domain.dataset_info import DatasetInfo
 
 
 class DatasetInfoView(QGroupBox):
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None):
         super().__init__("Информация о данных", parent)
 
         self._table = QTableWidget(self)
@@ -45,24 +45,30 @@ class DatasetInfoView(QGroupBox):
             ]
         )
 
-    def show_pipeline_result(self, result: ControllerPipelineResult) -> None:
-        processed = result.processed_dataset
-        metrics = result.evaluation_metrics
-
+    def show_dataset_info(self, dataset_info: DatasetInfo) -> None:
         self._populate(
             [
-                ("Набор данных", result.source_dataset_name),
-                ("Целевой столбец", result.target_column),
-                ("Признаков после кодирования", result.feature_count),
-                ("Классов", result.class_count),
-                ("Обучающая выборка", result.train_size),
-                ("Тестовая выборка", result.test_size),
-                ("Числовые признаки", ", ".join(processed.numeric_columns) or "—"),
+                ("Набор данных", dataset_info.source_dataset_name),
+                ("Целевой столбец", dataset_info.target_column),
+                ("Строк", dataset_info.row_count),
+                ("Столбцов", dataset_info.column_count),
+                ("Признаков", dataset_info.feature_count),
+                ("Числовые признаки", ", ".join(dataset_info.numeric_columns) or "—"),
                 (
                     "Категориальные признаки",
-                    ", ".join(processed.categorical_columns) or "—",
+                    ", ".join(dataset_info.categorical_columns) or "—",
                 ),
-                ("Стратегия оценки", metrics.average),
+                ("Классов", dataset_info.class_count),
+                (
+                    "Распределение классов",
+                    self._format_dict(dataset_info.class_distribution),
+                ),
+                ("Пропусков всего", dataset_info.total_missing_values),
+                (
+                    "Столбцы с пропусками",
+                    ", ".join(dataset_info.missing_columns) or "—",
+                ),
+                ("Дубликатов строк", dataset_info.duplicate_row_count),
             ]
         )
 
@@ -74,3 +80,9 @@ class DatasetInfoView(QGroupBox):
             self._table.setItem(row_index, 1, QTableWidgetItem(str(value)))
 
         self._table.resizeColumnsToContents()
+
+    @staticmethod
+    def _format_dict(values: dict[str, int]) -> str:
+        if not values:
+            return "—"
+        return ", ".join(f"{key}: {value}" for key, value in values.items())

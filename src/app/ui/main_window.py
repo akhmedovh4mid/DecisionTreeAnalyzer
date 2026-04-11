@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Анализ завершён")
 
     def _render_result(self, result: ControllerPipelineResult) -> None:
-        self._dataset_info_view.show_pipeline_result(result)
+        self._dataset_info_view.show_dataset_info(result.dataset_info)
         self._metrics_view.show_metrics(result.evaluation_metrics)
         self._tree_view.show_model(result.model)
 
