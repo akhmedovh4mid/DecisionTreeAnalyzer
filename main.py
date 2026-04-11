@@ -1,23 +1,17 @@
-from src.core.data_loading import DataLoader
-from src.core.decision_tree import DecisionTreeBuilder
-from src.core.prediction import Predictor
-from src.core.preprocessing import DataPreprocessor
+from src.app.controller import ApplicationController
 
 
 def main():
-    loader = DataLoader()
-    preprocessor = DataPreprocessor()
-    builder = DecisionTreeBuilder()
-    predictor = Predictor()
+    controller = ApplicationController()
 
-    dataset = loader.load("data/iris.csv")
-    processed = preprocessor.preprocess(dataset, target_column="species")
-    model = builder.build(processed)
+    result = controller.run_pipeline(
+        file_path="data/iris.csv",
+        target_column="species",
+    )
 
-    prediction_result = predictor.predict(model, processed, on="test")
-
-    print(prediction_result.predicted_values.head())
-    print(prediction_result.predicted_probabilities.head())
+    print(result.evaluation_metrics.score_summary)
+    print(result.model.depth)
+    print(result.prediction_result.predicted_values.head())
 
 
 if __name__ == "__main__":
