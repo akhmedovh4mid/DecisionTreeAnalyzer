@@ -27,10 +27,6 @@ class _ZoomableImageLabel(QLabel):
         self.setScaledContents(False)
         self.setText("Изображение дерева пока недоступно")
 
-    def has_image(self) -> bool:
-        pixmap = self.pixmap()
-        return pixmap is not None and not pixmap.isNull()
-
 
 class _ImageViewer(QFrame):
     _MIN_SCALE = 0.1
@@ -215,8 +211,8 @@ class TreeView(QGroupBox):
         self._text.setReadOnly(True)
 
         layout = QVBoxLayout()
-        layout.addWidget(self._image_viewer, stretch=3)
-        layout.addWidget(self._text, stretch=2)
+        layout.addWidget(self._image_viewer, stretch=1)
+        layout.addWidget(self._text, stretch=0)
         self.setLayout(layout)
 
     def clear(self) -> None:
