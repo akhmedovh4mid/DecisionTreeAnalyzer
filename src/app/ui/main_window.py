@@ -26,7 +26,6 @@ class MainWindow(QMainWindow):
     def __init__(self, controller: ApplicationController | None = None) -> None:
         super().__init__()
         self._controller = controller or ApplicationController()
-
         self._init_ui()
         self._connect_signals()
 
@@ -120,7 +119,7 @@ class MainWindow(QMainWindow):
     def _render_result(self, result: ControllerPipelineResult) -> None:
         self._dataset_info_view.show_dataset_info(result.dataset_info)
         self._metrics_view.show_metrics(result.evaluation_metrics)
-        self._tree_view.show_model(result.model)
+        self._tree_view.show_visualization(result.visualization_data)
 
     def _clear_views(self) -> None:
         self._dataset_info_view.clear()

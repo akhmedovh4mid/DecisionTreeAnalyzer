@@ -10,23 +10,21 @@ from src.core.decision_tree import DecisionTreeBuilder
 from src.core.evaluation import QualityEvaluator
 from src.core.prediction import Predictor
 from src.core.preprocessing import DataPreprocessor
+from src.core.visualization import Visualizer
 from src.domain.dataset import Dataset
 from src.domain.dataset_info import DatasetInfo
 from src.domain.decision_tree_model import DecisionTreeModel
 from src.domain.evaluation_metrics import EvaluationMetrics
 from src.domain.prediction_result import PredictionResult
 from src.domain.processed_dataset import ProcessedDataset
+from src.domain.visualization_data import VisualizationData
 
 
 class ScenarioControllerError(Exception):
-    """Базовая ошибка модуля управления сценарием работы."""
-
     pass
 
 
 class PipelineNotExecutedError(ScenarioControllerError):
-    """Ошибка: попытка получить результат до выполнения pipeline."""
-
     pass
 
 
@@ -36,16 +34,6 @@ EvaluationAverage = Literal["binary", "macro", "micro", "weighted"]
 
 @dataclass(slots=True)
 class ControllerPipelineConfig:
-    """
-    Конфигурация запуска pipeline.
-
-    Attributes:
-        target_column: Имя целевого столбца.
-        prediction_scope: На какой выборке выполнять прогнозирование.
-        evaluation_average: Стратегия усреднения для метрик качества.
-        zero_division: Значение для sklearn-метрик при делении на ноль.
-    """
-
     target_column: str
     prediction_scope: PredictionScope = "test"
     evaluation_average: EvaluationAverage = "weighted"
@@ -54,25 +42,13 @@ class ControllerPipelineConfig:
 
 @dataclass(slots=True)
 class ControllerPipelineResult:
-    """
-    Полный результат выполнения сценария анализа данных.
-
-    Хранит артефакты всех уже реализованных этапов:
-    - загрузка данных
-    - предобработка
-    - обучение дерева решений
-    - прогнозирование
-    - оценка качества
-
-    Этот объект можно напрямую использовать в UI-слое.
-    """
-
     dataset: Dataset
     dataset_info: DatasetInfo
     processed_dataset: ProcessedDataset
     model: DecisionTreeModel
     prediction_result: PredictionResult
     evaluation_metrics: EvaluationMetrics
+    visualization_data: VisualizationData
 
     @property
     def source_dataset_name(self) -> str:
@@ -100,55 +76,29 @@ class ControllerPipelineResult:
 
 
 class ApplicationController:
-    """
-    Координатор сценария работы системы анализа данных.
-
-    Назначение:
-    - связывает между собой функциональные модули ядра;
-    - управляет последовательностью этапов pipeline;
-    - предоставляет единый API для UI-слоя;
-    - хранит последний успешный результат выполнения сценария.
-
-    Текущий pipeline:
-        load -> preprocess -> build tree -> predict -> evaluate
-
-    Архитектурно контроллер:
-    - не содержит ML-логики;
-    - не содержит логики чтения файлов;
-    - не зависит от Qt;
-    - пригоден как для Desktop UI, так и для CLI / API.
-
-    Это позволяет встроить его в проект уже сейчас и не переделывать позже.
-    """
-
     def __init__(
         self,
-        *,
-        data_loader=None,
-        preprocessor=None,
-        analyzer=None,
-        tree_builder=None,
-        predictor=None,
-        evaluator=None,
-    ):
+        data_loader: DataLoader | None = None,
+        preprocessor: DataPreprocessor | None = None,
+        analyzer: DataAnalyzer | None = None,
+        tree_builder: DecisionTreeBuilder | None = None,
+        predictor: Predictor | None = None,
+        evaluator: QualityEvaluator | None = None,
+        visualizer: Visualizer | None = None,
+    ) -> None:
         self._data_loader = data_loader or DataLoader()
         self._preprocessor = preprocessor or DataPreprocessor()
         self._analyzer = analyzer or DataAnalyzer()
         self._tree_builder = tree_builder or DecisionTreeBuilder()
         self._predictor = predictor or Predictor()
         self._evaluator = evaluator or QualityEvaluator()
+        self._visualizer = visualizer or Visualizer()
 
         self._last_result: ControllerPipelineResult | None = None
         self._last_config: ControllerPipelineConfig | None = None
 
     @property
     def last_result(self) -> ControllerPipelineResult:
-        """
-        Возвращает последний успешный результат pipeline.
-
-        Raises:
-            PipelineNotExecutedError: если pipeline ещё ни разу не выполнялся.
-        """
         if self._last_result is None:
             raise PipelineNotExecutedError(
                 "Pipeline ещё не выполнялся. Сначала вызови run_pipeline(...)."
@@ -157,12 +107,6 @@ class ApplicationController:
 
     @property
     def last_config(self) -> ControllerPipelineConfig:
-        """
-        Возвращает конфигурацию последнего успешного запуска pipeline.
-
-        Raises:
-            PipelineNotExecutedError: если pipeline ещё ни разу не выполнялся.
-        """
         if self._last_config is None:
             raise PipelineNotExecutedError(
                 "Конфигурация отсутствует: pipeline ещё не выполнялся."
@@ -171,18 +115,9 @@ class ApplicationController:
 
     @property
     def has_result(self) -> bool:
-        """Показывает, был ли успешно выполнен pipeline хотя бы один раз."""
         return self._last_result is not None
 
     def reset(self) -> None:
-        """
-        Сбрасывает сохранённое состояние контроллера.
-
-        Полезно:
-        - при повторной загрузке нового файла;
-        - перед новой пользовательской сессией;
-        - в тестах.
-        """
         self._last_result = None
         self._last_config = None
 
@@ -190,35 +125,10 @@ class ApplicationController:
         self,
         file_path: str | Path,
         target_column: str,
-        *,
         prediction_scope: PredictionScope = "test",
         evaluation_average: EvaluationAverage = "weighted",
         zero_division: int = 0,
     ) -> ControllerPipelineResult:
-        """
-        Выполняет полный сценарий работы системы.
-
-        Этапы:
-            1. Загрузка данных
-            2. Предварительная обработка
-            3. Построение дерева решений
-            4. Прогнозирование
-            5. Оценка качества
-
-        Args:
-            file_path: Путь к исходному файлу данных.
-            target_column: Имя целевого столбца.
-            prediction_scope: train / test / full.
-            evaluation_average: Стратегия усреднения метрик.
-            zero_division: Поведение метрик при делении на ноль.
-
-        Returns:
-            ControllerPipelineResult: полный набор артефактов pipeline.
-
-        Raises:
-            ScenarioControllerError:
-                если произошла ошибка на любом этапе сценария.
-        """
         config = ControllerPipelineConfig(
             target_column=target_column,
             prediction_scope=prediction_scope,
@@ -241,6 +151,11 @@ class ApplicationController:
                 average=config.evaluation_average,
                 zero_division=config.zero_division,
             )
+            visualization_data = self.prepare_visualization(
+                dataset_info=dataset_info,
+                model=model,
+                metrics=evaluation_metrics,
+            )
         except Exception as exc:
             raise ScenarioControllerError(
                 f"Ошибка выполнения сценария анализа данных: {exc}"
@@ -253,20 +168,14 @@ class ApplicationController:
             model=model,
             prediction_result=prediction_result,
             evaluation_metrics=evaluation_metrics,
+            visualization_data=visualization_data,
         )
+
         self._last_result = result
         self._last_config = config
         return result
 
     def load_dataset(self, file_path: str | Path) -> Dataset:
-        """
-        Выполняет только этап загрузки данных.
-
-        Полезно для:
-        - UI-сценариев с пошаговой обработкой;
-        - предварительного просмотра файла;
-        - будущего подключения модуля анализа данных.
-        """
         try:
             return self._data_loader.load(file_path)
         except Exception as exc:
@@ -283,11 +192,10 @@ class ApplicationController:
             ) from exc
 
     def preprocess_dataset(
-        self, dataset: Dataset, target_column: str
+        self,
+        dataset: Dataset,
+        target_column: str,
     ) -> ProcessedDataset:
-        """
-        Выполняет только этап предварительной обработки данных.
-        """
         try:
             return self._preprocessor.preprocess(dataset, target_column)
         except Exception as exc:
@@ -296,9 +204,6 @@ class ApplicationController:
             ) from exc
 
     def build_model(self, processed_dataset: ProcessedDataset) -> DecisionTreeModel:
-        """
-        Выполняет только этап обучения дерева решений.
-        """
         try:
             return self._tree_builder.build(processed_dataset)
         except Exception as exc:
@@ -308,14 +213,10 @@ class ApplicationController:
 
     def make_prediction(
         self,
-        *,
         model: DecisionTreeModel,
         processed_dataset: ProcessedDataset,
         scope: PredictionScope = "test",
     ) -> PredictionResult:
-        """
-        Выполняет только этап прогнозирования.
-        """
         try:
             return self._predictor.predict(model, processed_dataset, on=scope)
         except Exception as exc:
@@ -325,14 +226,10 @@ class ApplicationController:
 
     def evaluate_prediction(
         self,
-        *,
         prediction_result: PredictionResult,
         average: EvaluationAverage = "weighted",
         zero_division: int = 0,
     ) -> EvaluationMetrics:
-        """
-        Выполняет только этап оценки качества.
-        """
         try:
             return self._evaluator.evaluate(
                 prediction_result,
@@ -344,21 +241,25 @@ class ApplicationController:
                 f"Ошибка на этапе оценки качества: {exc}"
             ) from exc
 
+    def prepare_visualization(
+        self,
+        dataset_info: DatasetInfo,
+        model: DecisionTreeModel,
+        metrics: EvaluationMetrics,
+    ) -> VisualizationData:
+        try:
+            return self._visualizer.prepare(dataset_info, model, metrics)
+        except Exception as exc:
+            raise ScenarioControllerError(
+                f"Ошибка на этапе подготовки визуализации: {exc}"
+            ) from exc
+
     def get_metrics_summary(self) -> dict[str, float]:
         return self.last_result.evaluation_metrics.score_summary
 
     def get_model_summary(self) -> dict[str, int | str]:
-        """
-        Возвращает краткую сводку по обученной модели.
-
-        Удобно для:
-        - карточки модели в UI;
-        - текстового отчёта;
-        - логирования.
-        """
         result = self.last_result
         model = result.model
-
         return {
             "dataset_name": result.source_dataset_name,
             "target_column": result.target_column,
@@ -372,10 +273,10 @@ class ApplicationController:
         }
 
     def get_feature_importances(self) -> dict[str, float]:
-        """
-        Возвращает важности признаков последней обученной модели.
-        """
         return self.last_result.model.feature_importances
 
     def get_dataset_summary(self) -> dict[str, int | str]:
         return self.last_result.dataset_info.summary
+
+    def get_visualization_data(self) -> VisualizationData:
+        return self.last_result.visualization_data
